@@ -1,4 +1,5 @@
 *~
 dual-primal.o
 dp-test.o
+solver.o
 dp-test

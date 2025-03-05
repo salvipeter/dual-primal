@@ -5,6 +5,7 @@
 #include <set>
 
 #include "dual-primal.hh"
+#include "solver.hh"
 
 using namespace Geometry;
 using SizePair = std::pair<size_t, size_t>;
@@ -87,8 +88,10 @@ void DualPrimal::createDual() {
   dual.verts.clear();
   dual.faces.clear();
   dual.faces.resize(primal.verts.size());
-  adjacent.clear();
-  adjacent.resize(primal.faces.size());
+  ff_map.clear();
+  ff_map.resize(primal.faces.size());
+  vf_map.clear();
+  vf_map.resize(primal.verts.size());
 
   std::map<SizePair, size_t> edgeToFace;
   auto addEdge = [&](size_t i, size_t j, size_t face) {
@@ -96,8 +99,8 @@ void DualPrimal::createDual() {
       std::swap(i, j);
     if (edgeToFace.contains({i, j})) {
       auto other = edgeToFace[{i, j}];
-      adjacent[face].push_back(other);
-      adjacent[other].push_back(face);
+      ff_map[face].push_back(other);
+      ff_map[other].push_back(face);
     } else
       edgeToFace[{i, j}] = face;
   };
@@ -106,6 +109,7 @@ void DualPrimal::createDual() {
     const auto &tri = primal.faces[ti];
     Point3D center(0, 0, 0);
     for (size_t i = 0; i < 3; ++i) {
+      vf_map[tri[i]].push_back(ti);
       center += primal.verts[tri[i]];
       dual.faces[tri[i]].push_back(ti);
       addEdge(tri[i], tri[(i+1)%3], ti);
@@ -126,7 +130,20 @@ void DualPrimal::optimizeDual() {
 }
 
 void DualPrimal::optimizePrimal() {
-
+  for (size_t i = 0; i < primal.verts.size(); ++i) {
+    auto &x = primal.verts[i];
+    VectorVector Lhs(3, Vector3D(0, 0, 0));
+    DoubleVector Rhs(3, 0);
+    for (auto j : vf_map[i]) {
+      const auto &Pj = dual.verts[j];
+      auto m = fdf(Pj).second.normalize();
+      for (size_t k = 0; k < 3; ++k) {
+        Lhs[k] += m * m[k];
+        Rhs[k] += m * (Pj - x) * m[k];
+      }
+    }
+    x += QEFSolver::solve(Lhs, Rhs, tau);
+  }
 }
 
 void DualPrimal::resamplePrimal() {
@@ -138,7 +155,7 @@ void DualPrimal::resamplePrimal() {
       auto pi = dual.verts[i];
       auto mi = fdf(pi).second.normalize();
       double ki = 0.0;
-      for (auto j : adjacent[i]) {
+      for (auto j : ff_map[i]) {
         auto pj = dual.verts[j];
         auto mj = fdf(pj).second.normalize();
         ki += std::acos(std::clamp(mi * mj, -1.0, 1.0)) / (pi - pj).norm();
@@ -158,7 +175,7 @@ void DualPrimal::subdividePrimal() {
   std::function<void(size_t)> sub = [&](size_t i) {
     halve.erase(i);
     subdivide.insert(i);
-    for (auto adj : adjacent[i])
+    for (auto adj : ff_map[i])
       if (!subdivide.contains(adj)) {
         if (halve.contains(adj))
           sub(adj);
@@ -213,9 +230,10 @@ void DualPrimal::subdividePrimal() {
       }
       tri[i] = midpoints[{a,b}];
     }
-    primal.faces.push_back({ t[0], tri[0], tri[2] });
-    primal.faces.push_back({ tri[0], t[1], tri[1] });
-    primal.faces.push_back({ tri[2], tri[1], t[2] });
+    auto t2 = tri;
+    primal.faces.push_back({ t[0], t2[0], t2[2] });
+    primal.faces.push_back({ t2[0], t[1], t2[1] });
+    primal.faces.push_back({ t2[2], t2[1], t[2] });
   }
 
   // Halve

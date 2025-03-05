@@ -22,7 +22,7 @@ struct DualPrimal {
   Surface fdf;                  // implicit surace (value + gradient)
   Mesh primal;                  // the original Marching Cubes mesh
 
-  double eps = 1e-3;            // precision - see "Optimizing dual mesh" on p. 173
+  double eps = 1e-4;            // precision - see "Optimizing dual mesh" on p. 173
   size_t iter_halve = 20;       // after how many iterations should lambda be halved, cf. p. 173
   size_t iter_trials = 5;       // maximum number of projection trials (not in the paper)
   double tau = 1e3;             // singular value threshold - see below Eq.(1) on p. 174
@@ -33,7 +33,8 @@ struct DualPrimal {
 
 private:
   Mesh dual;
-  std::vector<std::vector<size_t>> adjacent; // face-face (dual vertex-vertex) adjacency
+  std::vector<std::vector<size_t>> ff_map; // face-face (dual vertex-vertex) adjacency
+  std::vector<std::vector<size_t>> vf_map; // vertex-face (dual face-vertex) adjacency
 
   Geometry::Point3D project(const Geometry::Point3D &result, double edge_length) const;
   void createDual();

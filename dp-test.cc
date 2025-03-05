@@ -28,7 +28,7 @@ auto hunt(const Point3D &p) {
 auto spheres(const Point3D &p) {
   auto x = p[0] * p[0], y = p[1] * p[1], z = p[2] * p[2];
   auto v = x + y + z - 4.0/3.0 * std::abs(p[0]) - 5.0/9.0;
-  auto dx = 2 * p[0] - 4.0/3.0 * (x > 0 ? 1 : -1);
+  auto dx = 2 * p[0] - 4.0/3.0 * (p[0] > 0 ? 1 : -1);
   auto dy = 2 * p[1];
   auto dz = 2 * p[2];
   return std::make_pair(v, Vector3D(dx, dy, dz));
@@ -61,7 +61,8 @@ auto chmutov(size_t n) {
 
 int main() {
   DualPrimal dp;
-  dp.fdf = spheres;
+  // dp.fdf = spheres;
+  dp.fdf = star;
   // dp.fdf = hunt;
   // dp.fdf = chmutov(4);
   auto mesh = MarchingCubes::isosurface([&](const Point3D &p) { return dp.fdf(p).first; },
@@ -75,6 +76,7 @@ int main() {
                  [](const TriMesh::Triangle &t) {
                    return std::vector<size_t>(t.begin(), t.end());
                  });
+  dp.eps = 1e-5;
   dp.optimize();
   dp.primal.writeOBJ("/tmp/dp.obj");
 }

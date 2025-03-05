@@ -12,11 +12,11 @@ LIBS=   -L$(LIBGEOM)/release -lgeom \
 	-lasan
 
 # Debug
-#CXXFLAGS=-std=c++20 -Wall -pedantic -g -O0 -fsanitize=address $(INCLUDES)
+CXXFLAGS=-std=c++20 -Wall -pedantic -g -O0 -fsanitize=address $(INCLUDES)
 # Release
-CXXFLAGS=-std=c++20 -Wall -pedantic -O3 $(INCLUDES)
+#CXXFLAGS=-std=c++20 -Wall -pedantic -O3 $(INCLUDES)
 
-dp-test: dp-test.o dual-primal.o
+dp-test: dp-test.o dual-primal.o solver.o
 	$(CXX) -o $@ $^ $(LIBS)
 
 .PHONY: clean
