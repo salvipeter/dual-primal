@@ -13,9 +13,14 @@
 struct DualPrimal {
   using ValueGradient = std::pair<double, Geometry::Vector3D>;
   using Surface = std::function<ValueGradient(const Geometry::Point3D &)>;
+  struct Mesh {
+    Geometry::PointVector verts;
+    std::vector<std::vector<size_t>> faces;
+    void writeOBJ(std::string filename);
+  };
 
   Surface fdf;                  // implicit surace (value + gradient)
-  Geometry::TriMesh primal;     // the original Marching Cubes mesh
+  Mesh primal;                  // the original Marching Cubes mesh
 
   double eps = 1e-3;            // precision - see "Optimizing dual mesh" on p. 173
   double tau = 1e3;             // singular value threshold - see below Eq.(1) on p. 174
@@ -25,11 +30,9 @@ struct DualPrimal {
   void optimize();
 
 private:
-  struct DualMesh {
-    Geometry::PointVector verts;               // at projected primal mass centers
-    std::vector<std::vector<size_t>> faces;    // correspond to primal vertices
-    std::vector<std::vector<size_t>> adjacent; // (at most 3) adjacent (dual) vertices
-  } dual;
+  Mesh dual;
+  std::vector<std::vector<size_t>> adjacent; // face-face (dual vertex-vertex) adjacency
+
   Geometry::Point3D project(const Geometry::Point3D &result, double edge_length) const;
   void createDual();
   void optimizeDual();

@@ -1,3 +1,4 @@
+#include <algorithm>
 #include <cmath>
 
 #include "dual-primal.hh"
@@ -36,11 +37,17 @@ auto spheres(const Point3D &p) {
 int main() {
   DualPrimal dp;
   dp.fdf = spheres;
-  dp.primal = MarchingCubes::isosurface([&](const Point3D &p) { return dp.fdf(p).first; },
+  auto mesh = MarchingCubes::isosurface([&](const Point3D &p) { return dp.fdf(p).first; },
                                         {0, 0, 0}, 2.5, 4, 5);
-  // dp.primal = IMC::marching_cubes([&](const Point3D &p) { return dp.fdf(p).first; }, 0,
+  // auto mesh = IMC::marching_cubes([&](const Point3D &p) { return dp.fdf(p).first; }, 0,
   //                                 { { { -4, -4, -4 }, { 4, 4, 4 } } },
   //                                 { { 20, 20, 20 } });
+  dp.primal.verts = mesh.points();
+  std::transform(mesh.triangles().begin(), mesh.triangles().end(),
+                 std::back_inserter(dp.primal.faces),
+                 [](const TriMesh::Triangle &t) {
+                   return std::vector<size_t>(t.begin(), t.end());
+                 });
   dp.optimize();
   dp.primal.writeOBJ("/tmp/dp.obj");
 }
