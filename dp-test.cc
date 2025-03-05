@@ -38,7 +38,7 @@ int main() {
   DualPrimal dp;
   dp.fdf = spheres;
   auto mesh = MarchingCubes::isosurface([&](const Point3D &p) { return dp.fdf(p).first; },
-                                        {0, 0, 0}, 2.5, 4, 5);
+                                        {0, 0, 0}, 2.5, 4, 4);
   // auto mesh = IMC::marching_cubes([&](const Point3D &p) { return dp.fdf(p).first; }, 0,
   //                                 { { { -4, -4, -4 }, { 4, 4, 4 } } },
   //                                 { { 20, 20, 20 } });

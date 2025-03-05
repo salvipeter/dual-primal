@@ -7,6 +7,7 @@
 #include "dual-primal.hh"
 
 using namespace Geometry;
+using SizePair = std::pair<size_t, size_t>;
 
 void DualPrimal::Mesh::writeOBJ(std::string filename) {
   std::ofstream f(filename);
@@ -78,9 +79,10 @@ void DualPrimal::createDual() {
   dual.verts.clear();
   dual.faces.clear();
   dual.faces.resize(primal.verts.size());
+  adjacent.clear();
   adjacent.resize(primal.faces.size());
 
-  std::map<std::pair<size_t, size_t>, size_t> edgeToFace;
+  std::map<SizePair, size_t> edgeToFace;
   auto addEdge = [&](size_t i, size_t j, size_t face) {
     if (i > j)
       std::swap(i, j);
@@ -144,16 +146,28 @@ void DualPrimal::resamplePrimal() {
 
 void DualPrimal::subdividePrimal() {
   std::set<size_t> subdivide;
-  std::map<size_t, size_t> halve;
+  std::map<size_t, std::pair<SizePair, size_t>> halve;
   std::function<void(size_t)> sub = [&](size_t i) {
+    halve.erase(i);
     subdivide.insert(i);
     for (auto adj : adjacent[i])
       if (!subdivide.contains(adj)) {
-        if (halve.contains(adj)) {
-          halve.erase(adj);
+        if (halve.contains(adj))
           sub(adj);
-        } else
-          halve[adj] = i;
+        else {
+          const auto &tri = primal.faces[adj];
+          const auto &other = primal.faces[i];
+          size_t ci = -1;
+          for (size_t j = 0; j < 3; ++j)
+            if (std::find(other.begin(), other.end(), tri[j]) == other.end()) {
+              ci = j;
+              break;
+            }
+          auto a = tri[(ci+1)%3], b = tri[(ci+2)%3];
+          if (a > b)
+            std::swap(a, b);
+          halve[adj] = std::make_pair(std::make_pair(a, b), ci);
+        }
       }
   };
 
@@ -181,41 +195,31 @@ void DualPrimal::subdividePrimal() {
   }
 
   // Subdivide
-  std::map<std::pair<size_t, size_t>, size_t> midpoints;
+  std::map<SizePair, size_t> midpoints;
   for (auto ti : subdivide) {
     auto &tri = primal.faces[ti];
-    auto mi = primal.verts.size();
+    auto t = tri;
     for (size_t i = 0; i < 3; ++i) {
-      auto a = tri[i], b = tri[(i+1)%3];
+      auto a = t[i], b = t[(i+1)%3];
       if (a > b)
         std::swap(a, b);
-      midpoints[{a,b}] = mi + i;
-      primal.verts.push_back((primal.verts[a] + primal.verts[b]) / 2);
+      if (!midpoints.contains({a,b})) {
+        midpoints[{a,b}] = primal.verts.size();
+        primal.verts.push_back((primal.verts[a] + primal.verts[b]) / 2);
+      }
+      tri[i] = midpoints[{a,b}];
     }
-    primal.faces.push_back({ tri[0], mi, mi + 2 });
-    primal.faces.push_back({ mi, tri[1], mi + 1 });
-    primal.faces.push_back({ mi + 2, mi + 1, tri[2] });
-    tri[0] = mi;
-    tri[1] = mi + 1;
-    tri[2] = mi + 2;
+    primal.faces.push_back({ t[0], tri[0], tri[2] });
+    primal.faces.push_back({ tri[0], t[1], tri[1] });
+    primal.faces.push_back({ tri[2], tri[1], t[2] });
   }
 
   // Halve
-  for (auto [ti1, ti2] : halve) {
-    auto &tri = primal.faces[ti1];
-    const auto &other = primal.faces[ti2];
-    size_t ci = -1;
-    for (size_t i = 0; i < 3; ++i)
-      if (std::find(other.begin(), other.end(), tri[i]) == other.end()) {
-        ci = i;
-        break;
-      }
-    auto a = tri[(ci+1)%3], b = tri[(ci+2)%3], c = tri[ci];
-    size_t m;
-    if (a > b)
-      m = midpoints[{b,a}];
-    else
-      m = midpoints[{a,b}];
+  for (const auto &[ti, abc] : halve) {
+    auto &tri = primal.faces[ti];
+    auto [ab, ci] = abc;
+    auto m = midpoints[ab];
+    auto a = tri[(ci+1)%3], c = tri[ci];
     tri[(ci+1)%3] = m;
     primal.faces.push_back({ m, c, a });
   }
