@@ -42,11 +42,19 @@ Point3D DualPrimal::project(const Point3D &p, double edge_length) const {
   if (std::abs(v) / d.norm() < eps)
     return p;
   auto lambda = edge_length / 2;
-  // TODO: "If the number of iterations is too large, we set lambda to half its previous value
-  //        in order to catch thin components of the implicit surface." ???
   Point3D q = p, r;
+  size_t iter = 0;
   while (true) {                // v, d are the value/gradient at q
-    d *= -1;
+    if (++iter % iter_halve == 0) {
+      if (++iter == iter_halve * iter_trials)
+        return p;
+      // Start over with smaller lambda
+      auto vd = fdf(p);
+      v = vd.first; d = vd.second;
+      q = p;
+      lambda /= 2;
+    }
+    d *= -v;
     d.normalize();
     r = q + d * lambda;
     auto [v1, d1] = fdf(r);
@@ -179,16 +187,12 @@ void DualPrimal::subdividePrimal() {
     PointVector centroids = {
       (a + ab + ac) / 3, (b + ab + bc) / 3, (c + ac + bc) / 3, (ab + ac + bc) / 3
     };
-    VectorVector normals = {
-      ((ab - a) ^ (ac - a)).normalize(),
-      ((ab - b) ^ (bc - b)).normalize(),
-      ((ac - c) ^ (bc - c)).normalize(),
-      ((ac - ab) ^ (bc - ab)).normalize()
-    };
-    auto area = ((b - a) ^ (c - a)).norm() / 2;
+    auto normal = (b - a) ^ (c - a);
+    auto area = normal.norm() / 2;
+    normal.normalize();
     double err = 0;
     for (size_t i = 0; i < 4; ++i)
-      err += 1 - std::abs(normals[i] * fdf(centroids[i]).second.normalize());
+      err += 1 - std::abs(normal * fdf(centroids[i]).second.normalize());
     err *= area;
     if (err > eps)
       sub(ti);

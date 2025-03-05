@@ -34,11 +34,38 @@ auto spheres(const Point3D &p) {
   return std::make_pair(v, Vector3D(dx, dy, dz));
 }
 
+double chebyshev(size_t n, double x) {
+  if (n == 0)
+    return 1;
+  if (n == 1)
+    return x;
+  return 2 * x * chebyshev(n - 1, x) - chebyshev(n - 2, x);
+}
+
+double chebyshevd(size_t n, double x) {
+  if (n < 2)
+    return n;
+  return 2 * chebyshev(n - 1, x) + 2 * x * chebyshevd(n - 1, x) - chebyshevd(n - 2, x);
+}
+
+// Banchoff-Chmutov, n is even
+auto chmutov(size_t n) {
+  return [=](const Point3D &p) {
+    auto v = chebyshev(n, p[0]) + chebyshev(n, p[1]) + chebyshev(n, p[2]);
+    auto dx = chebyshevd(n, p[0]);
+    auto dy = chebyshevd(n, p[1]);
+    auto dz = chebyshevd(n, p[2]);
+    return std::make_pair(v, Vector3D(dx, dy, dz));
+  };
+}
+
 int main() {
   DualPrimal dp;
   dp.fdf = spheres;
+  // dp.fdf = hunt;
+  // dp.fdf = chmutov(4);
   auto mesh = MarchingCubes::isosurface([&](const Point3D &p) { return dp.fdf(p).first; },
-                                        {0, 0, 0}, 2.5, 4, 4);
+                                        {0, 0, 0}, 4.5, 4, 4);
   // auto mesh = IMC::marching_cubes([&](const Point3D &p) { return dp.fdf(p).first; }, 0,
   //                                 { { { -4, -4, -4 }, { 4, 4, 4 } } },
   //                                 { { 20, 20, 20 } });

@@ -23,6 +23,8 @@ struct DualPrimal {
   Mesh primal;                  // the original Marching Cubes mesh
 
   double eps = 1e-3;            // precision - see "Optimizing dual mesh" on p. 173
+  size_t iter_halve = 20;       // after how many iterations should lambda be halved, cf. p. 173
+  size_t iter_trials = 5;       // maximum number of projection trials (not in the paper)
   double tau = 1e3;             // singular value threshold - see below Eq.(1) on p. 174
   double c = 2.0;               // curvature dependency - see Eq. (4) on p. 174
   size_t m = 3, n = 3;          // iterations - see the end of p. 175
