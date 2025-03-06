@@ -2,6 +2,7 @@
 #include <cmath>
 
 #include "dual-primal.hh"
+#include "dc.hh"                // https://github.com/salvipeter/dual-contouring
 #include "marching.hh"          // https://github.com/salvipeter/marching/
 #include "mc.h"                 // https://github.com/agostonsipos/implici_marching_cubes/
 
@@ -65,11 +66,32 @@ int main() {
   dp.fdf = star;
   // dp.fdf = hunt;
   // dp.fdf = chmutov(4);
-  auto mesh = MarchingCubes::isosurface([&](const Point3D &p) { return dp.fdf(p).first; },
-                                        {0, 0, 0}, 4.5, 4, 4);
-  // auto mesh = IMC::marching_cubes([&](const Point3D &p) { return dp.fdf(p).first; }, 0,
-  //                                 { { { -4, -4, -4 }, { 4, 4, 4 } } },
-  //                                 { { 20, 20, 20 } });
+
+  TriMesh mesh;
+
+  // Version 1: Marching Cubes
+  // mesh = MarchingCubes::isosurface([&](const Point3D &p) { return dp.fdf(p).first; },
+  //                                  {0, 0, 0}, 4.5, 4, 4);
+
+  // Version 2: Agoston's Marching Cubes
+  // mesh = IMC::marching_cubes([&](const Point3D &p) { return dp.fdf(p).first; }, 0,
+  //                            { { { -4, -4, -4 }, { 4, 4, 4 } } },
+  //                            { { 20, 20, 20 } });
+
+  // Version 3: Dual Contouring
+  auto quad = DualContouring::isosurface([&](const DualContouring::Point3D &p) {
+    return dp.fdf(Point3D(p[0], p[1], p[2])).first;
+  }, 0, { { { -4, -4, -4 }, { 4, 4, 4 } } }, { { 20, 20, 20 } });
+  mesh.resizePoints(quad.points.size());
+  for (size_t i = 0; i < quad.points.size(); ++i) {
+    const auto &p = quad.points[i];
+    mesh[i] = Point3D(p[0], p[1], p[2]);
+  }
+  for (const auto &q : quad.quads) {
+    mesh.addTriangle(q[0] - 1, q[1] - 1, q[2] - 1);
+    mesh.addTriangle(q[0] - 1, q[2] - 1, q[3] - 1);
+  }
+
   dp.primal.verts = mesh.points();
   std::transform(mesh.triangles().begin(), mesh.triangles().end(),
                  std::back_inserter(dp.primal.faces),
