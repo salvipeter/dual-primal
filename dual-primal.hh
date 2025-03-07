@@ -11,14 +11,16 @@
 #include <Eigen/Core>
 
 struct DualPrimal {
-  using Vector3D = Eigen::Vector3d;
+  using Real = float;
+  using Vector3D = Eigen::Vector<Real, 3>;
   using Point3D = Vector3D;
+  using IndexVector = std::vector<size_t>;
   using PointVector = std::vector<Point3D>;
   using ValueGradient = std::pair<double, Vector3D>;
   using Surface = std::function<ValueGradient(const Point3D &)>;
   struct Mesh {
-    PointVector verts;
-    std::vector<std::vector<size_t>> faces;
+    std::vector<Point3D> verts;
+    std::vector<IndexVector> faces;
     void writeOBJ(std::string filename);
   };
 
@@ -36,8 +38,8 @@ struct DualPrimal {
 
 private:
   Mesh dual;
-  std::vector<std::vector<size_t>> ff_map; // face-face (dual vertex-vertex) adjacency
-  std::vector<std::vector<size_t>> vf_map; // vertex-face (dual face-vertex) adjacency
+  std::vector<IndexVector> ff_map; // face-face (dual vertex-vertex) adjacency
+  std::vector<IndexVector> vf_map; // vertex-face (dual face-vertex) adjacency
 
   Point3D project(const Point3D &result, double edge_length) const;
   void createDual();

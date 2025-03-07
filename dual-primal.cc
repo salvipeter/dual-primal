@@ -7,9 +7,15 @@
 #include <Eigen/Dense>
 
 #include "dual-primal.hh"
-#include "solver.hh"
 
-using SizePair = std::pair<size_t, size_t>;
+using namespace Eigen;
+
+using Real = DualPrimal::Real;
+using Point3D = DualPrimal::Point3D;
+using Vector3D = DualPrimal::Vector3D;
+using IndexPair = std::pair<size_t, size_t>;
+using DoubleVector = std::vector<double>;
+using VectorVector = std::vector<Vector3D>;
 
 void DualPrimal::Mesh::writeOBJ(std::string filename) {
   std::ofstream f(filename);
@@ -39,7 +45,7 @@ void DualPrimal::optimize() {
   }
 }
 
-DualPrimal::Point3D DualPrimal::project(const DualPrimal::Point3D &p, double edge_length) const {
+Point3D DualPrimal::project(const Point3D &p, double edge_length) const {
   auto [v, d] = fdf(p);
   if (std::abs(v) / d.norm() < eps)
     return p;
@@ -94,7 +100,7 @@ void DualPrimal::createDual() {
   vf_map.clear();
   vf_map.resize(primal.verts.size());
 
-  std::map<SizePair, size_t> edgeToFace;
+  std::map<IndexPair, size_t> edgeToFace;
   auto addEdge = [&](size_t i, size_t j, size_t face) {
     if (i > j)
       std::swap(i, j);
@@ -130,27 +136,26 @@ void DualPrimal::optimizeDual() {
   }
 }
 
-static DualPrimal::Vector3D solve(const std::vector<DualPrimal::Vector3D> &Lhs,
-                                  const std::vector<double> &Rhs, double tau) {
-  Eigen::MatrixXd A(Lhs.size(), 3);
-  Eigen::VectorXd b(Rhs.size());
+static Vector3D solve(const VectorVector &Lhs, const DoubleVector &Rhs, double tau) {
+  Matrix<Real, Dynamic, Dynamic> A(Lhs.size(), 3);
+  Vector<Real, Dynamic> b(Rhs.size());
   for (size_t i = 0; i < Lhs.size(); ++i) {
     for (size_t j = 0; j < 3; ++j)
       A(i, j) = Lhs[i][j];
     b(i) = Rhs[i];
   }
 
-  Eigen::JacobiSVD<Eigen::MatrixXd> svd(A, Eigen::ComputeThinU | Eigen::ComputeThinV);
+  JacobiSVD svd(A, ComputeThinU | ComputeThinV);
   if (tau > 0)
     svd.setThreshold(1 / tau);
-  return DualPrimal::Vector3D(Eigen::Vector3d(svd.solve(b)).data());
+  return svd.solve(b);
 }
 
 void DualPrimal::optimizePrimal() {
   for (size_t i = 0; i < primal.verts.size(); ++i) {
     auto &x = primal.verts[i];
-    std::vector<Vector3D> Lhs(3, Vector3D(0, 0, 0));
-    std::vector<double> Rhs(3, 0);
+    VectorVector Lhs(3, Vector3D(0, 0, 0));
+    DoubleVector Rhs(3, 0);
     for (auto j : vf_map[i]) {
       const auto &Pj = dual.verts[j];
       auto m = fdf(Pj).second.normalized();
@@ -175,7 +180,7 @@ void DualPrimal::resamplePrimal() {
       for (auto j : ff_map[i]) {
         auto pj = dual.verts[j];
         auto mj = fdf(pj).second.normalized();
-        ki += std::acos(std::clamp(mi.dot(mj), -1.0, 1.0)) / (pi - pj).norm();
+        ki += std::acos(std::clamp<Real>(mi.dot(mj), -1, 1)) / (pi - pj).norm();
       }
       auto wi = 1 + c * ki;
       p += pi * wi;
@@ -188,7 +193,7 @@ void DualPrimal::resamplePrimal() {
 
 void DualPrimal::subdividePrimal() {
   std::set<size_t> subdivide;
-  std::map<size_t, std::pair<SizePair, size_t>> halve;
+  std::map<size_t, std::pair<IndexPair, size_t>> halve;
   std::function<void(size_t)> sub = [&](size_t i) {
     halve.erase(i);
     subdivide.insert(i);
@@ -233,7 +238,7 @@ void DualPrimal::subdividePrimal() {
   }
 
   // Subdivide
-  std::map<SizePair, size_t> midpoints;
+  std::map<IndexPair, size_t> midpoints;
   for (auto ti : subdivide) {
     auto &tri = primal.faces[ti];
     auto t = tri;
