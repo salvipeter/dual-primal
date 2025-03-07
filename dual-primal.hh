@@ -24,7 +24,7 @@ struct DualPrimal {
     void writeOBJ(std::string filename);
   };
 
-  Surface fdf;                  // implicit surace (value + gradient)
+  Surface fdf;                  // implicit surface (value + gradient)
   Mesh primal;                  // the original Marching Cubes mesh
 
   double eps = 1e-4;            // precision - see "Optimizing dual mesh" on p. 173
