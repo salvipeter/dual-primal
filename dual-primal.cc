@@ -136,35 +136,23 @@ void DualPrimal::optimizeDual() {
   }
 }
 
-static Vector3D solve(const VectorVector &Lhs, const DoubleVector &Rhs, double tau) {
-  Matrix<Real, Dynamic, Dynamic> A(Lhs.size(), 3);
-  Vector<Real, Dynamic> b(Rhs.size());
-  for (size_t i = 0; i < Lhs.size(); ++i) {
-    for (size_t j = 0; j < 3; ++j)
-      A(i, j) = Lhs[i][j];
-    b(i) = Rhs[i];
-  }
-
-  JacobiSVD svd(A, ComputeThinU | ComputeThinV);
-  if (tau > 0)
-    svd.setThreshold(1 / tau);
-  return svd.solve(b);
-}
-
 void DualPrimal::optimizePrimal() {
   for (size_t i = 0; i < primal.verts.size(); ++i) {
     auto &x = primal.verts[i];
-    VectorVector Lhs(3, Vector3D(0, 0, 0));
-    DoubleVector Rhs(3, 0);
+    Matrix<Real, 3, 3> A = Matrix<Real, 3, 3>::Zero();
+    Vector3D b = Vector3D::Zero();
     for (auto j : vf_map[i]) {
       const auto &Pj = dual.verts[j];
       auto m = fdf(Pj).second.normalized();
       for (size_t k = 0; k < 3; ++k) {
-        Lhs[k] += m * m[k];
-        Rhs[k] += m.dot(Pj - x) * m[k];
+        A.row(k) += m * m[k];
+        b[k] += m.dot(Pj - x) * m[k];
       }
     }
-    x += solve(Lhs, Rhs, tau);
+    JacobiSVD svd(A, ComputeFullU | ComputeFullV);
+    if (tau > 0)
+      svd.setThreshold(1 / tau);
+    x += svd.solve(b);
   }
 }
 
