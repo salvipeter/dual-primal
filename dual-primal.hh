@@ -8,13 +8,16 @@
 //     https://doi.org/10.1145/566282.56630
 
 #include <functional>
-#include <geometry.hh>          // https://github.com/salvipeter/libgeom/
+#include <Eigen/Core>
 
 struct DualPrimal {
-  using ValueGradient = std::pair<double, Geometry::Vector3D>;
-  using Surface = std::function<ValueGradient(const Geometry::Point3D &)>;
+  using Vector3D = Eigen::Vector3d;
+  using Point3D = Vector3D;
+  using PointVector = std::vector<Point3D>;
+  using ValueGradient = std::pair<double, Vector3D>;
+  using Surface = std::function<ValueGradient(const Point3D &)>;
   struct Mesh {
-    Geometry::PointVector verts;
+    PointVector verts;
     std::vector<std::vector<size_t>> faces;
     void writeOBJ(std::string filename);
   };
@@ -36,7 +39,7 @@ private:
   std::vector<std::vector<size_t>> ff_map; // face-face (dual vertex-vertex) adjacency
   std::vector<std::vector<size_t>> vf_map; // vertex-face (dual face-vertex) adjacency
 
-  Geometry::Point3D project(const Geometry::Point3D &result, double edge_length) const;
+  Point3D project(const Point3D &result, double edge_length) const;
   void createDual();
   void optimizeDual();
   void optimizePrimal();

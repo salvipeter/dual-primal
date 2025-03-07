@@ -4,10 +4,11 @@
 #include <map>
 #include <set>
 
+#include <Eigen/Dense>
+
 #include "dual-primal.hh"
 #include "solver.hh"
 
-using namespace Geometry;
 using SizePair = std::pair<size_t, size_t>;
 
 void DualPrimal::Mesh::writeOBJ(std::string filename) {
@@ -38,7 +39,7 @@ void DualPrimal::optimize() {
   }
 }
 
-Point3D DualPrimal::project(const Point3D &p, double edge_length) const {
+DualPrimal::Point3D DualPrimal::project(const DualPrimal::Point3D &p, double edge_length) const {
   auto [v, d] = fdf(p);
   if (std::abs(v) / d.norm() < eps)
     return p;
@@ -129,20 +130,36 @@ void DualPrimal::optimizeDual() {
   }
 }
 
+static DualPrimal::Vector3D solve(const std::vector<DualPrimal::Vector3D> &Lhs,
+                                  const std::vector<double> &Rhs, double tau) {
+  Eigen::MatrixXd A(Lhs.size(), 3);
+  Eigen::VectorXd b(Rhs.size());
+  for (size_t i = 0; i < Lhs.size(); ++i) {
+    for (size_t j = 0; j < 3; ++j)
+      A(i, j) = Lhs[i][j];
+    b(i) = Rhs[i];
+  }
+
+  Eigen::JacobiSVD<Eigen::MatrixXd> svd(A, Eigen::ComputeThinU | Eigen::ComputeThinV);
+  if (tau > 0)
+    svd.setThreshold(1 / tau);
+  return DualPrimal::Vector3D(Eigen::Vector3d(svd.solve(b)).data());
+}
+
 void DualPrimal::optimizePrimal() {
   for (size_t i = 0; i < primal.verts.size(); ++i) {
     auto &x = primal.verts[i];
-    VectorVector Lhs(3, Vector3D(0, 0, 0));
-    DoubleVector Rhs(3, 0);
+    std::vector<Vector3D> Lhs(3, Vector3D(0, 0, 0));
+    std::vector<double> Rhs(3, 0);
     for (auto j : vf_map[i]) {
       const auto &Pj = dual.verts[j];
-      auto m = fdf(Pj).second.normalize();
+      auto m = fdf(Pj).second.normalized();
       for (size_t k = 0; k < 3; ++k) {
         Lhs[k] += m * m[k];
-        Rhs[k] += m * (Pj - x) * m[k];
+        Rhs[k] += m.dot(Pj - x) * m[k];
       }
     }
-    x += QEFSolver::solve(Lhs, Rhs, tau);
+    x += solve(Lhs, Rhs, tau);
   }
 }
 
@@ -153,12 +170,12 @@ void DualPrimal::resamplePrimal() {
     Point3D p(0, 0, 0);
     for (auto i : dual.faces[v]) {
       auto pi = dual.verts[i];
-      auto mi = fdf(pi).second.normalize();
+      auto mi = fdf(pi).second.normalized();
       double ki = 0.0;
       for (auto j : ff_map[i]) {
         auto pj = dual.verts[j];
-        auto mj = fdf(pj).second.normalize();
-        ki += std::acos(std::clamp(mi * mj, -1.0, 1.0)) / (pi - pj).norm();
+        auto mj = fdf(pj).second.normalized();
+        ki += std::acos(std::clamp(mi.dot(mj), -1.0, 1.0)) / (pi - pj).norm();
       }
       auto wi = 1 + c * ki;
       p += pi * wi;
@@ -204,12 +221,12 @@ void DualPrimal::subdividePrimal() {
     PointVector centroids = {
       (a + ab + ac) / 3, (b + ab + bc) / 3, (c + ac + bc) / 3, (ab + ac + bc) / 3
     };
-    auto normal = (b - a) ^ (c - a);
+    auto normal = (b - a).cross(c - a);
     auto area = normal.norm() / 2;
     normal.normalize();
     double err = 0;
     for (size_t i = 0; i < 4; ++i)
-      err += 1 - std::abs(normal * fdf(centroids[i]).second.normalize());
+      err += 1 - std::abs(normal.dot(fdf(centroids[i]).second.normalized()));
     err *= area;
     if (err > eps)
       sub(ti);

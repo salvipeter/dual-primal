@@ -18,7 +18,7 @@ LIBS=   -L$(LIBGEOM)/release -lgeom \
 # Release
 CXXFLAGS=-std=c++20 -Wall -pedantic -O3 $(INCLUDES)
 
-dp-test: dp-test.o dual-primal.o solver.o
+dp-test: dp-test.o dual-primal.o
 	$(CXX) -o $@ $^ $(LIBS)
 
 .PHONY: clean

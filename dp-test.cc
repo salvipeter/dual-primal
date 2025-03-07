@@ -61,11 +61,10 @@ auto chmutov(size_t n) {
 }
 
 int main() {
-  DualPrimal dp;
-  // dp.fdf = spheres;
-  dp.fdf = star;
-  // dp.fdf = hunt;
-  // dp.fdf = chmutov(4);
+  // auto fdf = spheres;
+  auto fdf = star;
+  // auto fdf = hunt;
+  // auto fdf = chmutov(4);
 
   TriMesh mesh;
 
@@ -80,7 +79,7 @@ int main() {
 
   // Version 3: Dual Contouring
   auto quad = DualContouring::isosurface([&](const DualContouring::Point3D &p) {
-    return dp.fdf(Point3D(p[0], p[1], p[2])).first;
+    return fdf(Point3D(p[0], p[1], p[2])).first;
   }, 0, { { { -4, -4, -4 }, { 4, 4, 4 } } }, { { 20, 20, 20 } });
   mesh.resizePoints(quad.points.size());
   for (size_t i = 0; i < quad.points.size(); ++i) {
@@ -92,7 +91,14 @@ int main() {
     mesh.addTriangle(q[0] - 1, q[2] - 1, q[3] - 1);
   }
 
-  dp.primal.verts = mesh.points();
+  DualPrimal dp;
+  dp.fdf = [&](const DualPrimal::Point3D &p) {
+    auto [v, d] = fdf({ p[0], p[1], p[2] });
+    return std::make_pair(v, DualPrimal::Vector3D(d[0], d[1], d[2]));
+  };
+  std::transform(mesh.points().begin(), mesh.points().end(),
+                 std::back_inserter(dp.primal.verts),
+                 [](const Point3D &p) { return DualPrimal::Point3D(p[0], p[1], p[2]); });
   std::transform(mesh.triangles().begin(), mesh.triangles().end(),
                  std::back_inserter(dp.primal.faces),
                  [](const TriMesh::Triangle &t) {
