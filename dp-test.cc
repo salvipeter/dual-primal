@@ -8,6 +8,16 @@
 
 using namespace Geometry;
 
+auto lemniscate(const Point3D &p) {
+  Point3D f1(-1, 0, 0), f2(1, 0, 0);
+  auto v = (p - f1).norm() * (p - f2).norm() - 1.01;
+  auto x = p[0] * p[0], y = p[1] * p[1], z = p[2] * p[2];
+  auto dx = 4 * (x - 1) * p[0] + 4 * p[0] * (y + z);
+  auto dy = 4 * (x + 1) * p[1] + 4 * y * p[1] + 4 * z * p[1];
+  auto dz = 4 * (x + 1) * p[2] + 4 * y * p[2] + 4 * z * p[2];
+  return std::make_pair(v, Vector3D(dx, dy, dz));
+}
+
 auto star(const Point3D &p) {
   auto x = p[0] * p[0], y = p[1] * p[1], z = p[2] * p[2];
   auto v = 400 * (x * y + y * z + x * z) - std::pow(1 - x - y - z, 3);
@@ -63,9 +73,10 @@ auto chmutov(size_t n) {
 int main() {
   DualPrimal dp;
   // dp.fdf = spheres;
-  dp.fdf = star;
+  // dp.fdf = star;
   // dp.fdf = hunt;
   // dp.fdf = chmutov(4);
+  dp.fdf = lemniscate;
 
   TriMesh mesh;
 
@@ -98,7 +109,7 @@ int main() {
                  [](const TriMesh::Triangle &t) {
                    return std::vector<size_t>(t.begin(), t.end());
                  });
-  dp.eps = 1e-5;
+  dp.eps = 1e-6;
   dp.optimize();
   dp.primal.writeOBJ("/tmp/dp.obj");
 }

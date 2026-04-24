@@ -44,10 +44,10 @@ Point3D DualPrimal::project(const Point3D &p, double edge_length) const {
     return p;
   auto lambda = edge_length / 2;
   Point3D q = p, r;
-  size_t iter = 0;
+  size_t iter = 1;
   while (true) {                // v, d are the value/gradient at q
-    if (++iter % iter_halve == 0) {
-      if (++iter == iter_halve * iter_trials)
+    if (iter % iter_halve == 0) {
+      if (iter == iter_halve * iter_trials)
         return p;
       // Start over with smaller lambda
       auto vd = fdf(p);
@@ -66,6 +66,7 @@ Point3D DualPrimal::project(const Point3D &p, double edge_length) const {
     q = r;
     v = v1;
     d = d1;
+    ++iter;
   }
   // Bisection between q and r
   double lo = 0, hi = 1;
